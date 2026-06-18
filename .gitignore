@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Exclude large data folders
+CFAD_cm_protocols_rock/
+Mandarin_flac/

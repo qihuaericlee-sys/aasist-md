@@ -1,0 +1,2 @@
+CM SYSTEM
+	EER		=      nan % (Equal error rate for countermeasure)
