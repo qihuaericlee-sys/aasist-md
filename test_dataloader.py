@@ -11,7 +11,7 @@ import time
 
 # 切到 aasist 目录 (如果不在的话)
 if not os.path.exists("data_utils.py"):
-    os.chdir("/home/comp/25450212/aasist")
+    os.chdir("/home/comp/25450212/aasist/aasist")  # main.py, data_utils.py 所在目录
 
 import torch
 import numpy as np
@@ -20,8 +20,8 @@ from data_utils import genSpoof_list, Dataset_ASVspoof2019_train, Dataset_ASVspo
 from torch.utils.data import DataLoader
 
 CONFIG = {
-    "database_path": "/home/comp/25450212/Mandarin_flac",
-    "protocol_dir": "/home/comp/25450212/CFAD_cm_protocols_rock/CFAD_cm_protocols",
+    "database_path": "/home/comp/25450212/dataset/Mandarin_flac",
+    "protocol_dir": "/home/comp/25450212/dataset/CFAD_cm_protocols_rock/CFAD_cm_protocols",
     "batch_size": 16,
     "track": "LA",
 }

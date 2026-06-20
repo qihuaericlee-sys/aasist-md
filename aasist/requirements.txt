@@ -1,4 +1,22 @@
-torch>=1.6.0
-torchcontrib
-numpy
-soundfile
+# ===========================================================================
+#  AASIST 依赖清单 — HKBU DAAI GPU Cluster
+#  ===========================================================================
+#  安装方式 (在 Slurm 脚本或登录节点):
+#    pip install --user -r requirements.txt
+#
+#  PyTorch 需要单独安装 (CUDA 11.3 版本, 兼容集群 CUDA 11.4 驱动):
+#    pip install --user torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1+cu113 \
+#        --extra-index-url https://download.pytorch.org/whl/cu113
+# ===========================================================================
+
+# 核心依赖
+torch>=1.6.0,<2.0.0
+numpy>=1.19.0
+soundfile>=0.10.0
+
+# 可选依赖 — 音频加载备选方案 (如果 soundfile 无法解析 FLAC)
+# librosa>=0.8.0
+# torchaudio>=0.12.0
+
+# 可选 — 用于 torchcontrib (如果代码中用到 SWA 旧版 API)
+# torchcontrib>=0.0.2

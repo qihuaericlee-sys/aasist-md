@@ -56,7 +56,7 @@ def main(args: argparse.Namespace) -> None:
     database_path = Path(args.database_path or config["database_path"])
     protocol_dir = Path(args.protocol_dir or config.get(
         "protocol_dir",
-        "/home/comp/25450212/CFAD_cm_protocols_rock/CFAD_cm_protocols"))
+        "/home/comp/25450212/dataset/CFAD_cm_protocols_rock/CFAD_cm_protocols"))
     eval_split = args.eval_split  # "seen" or "unseen"
     dev_trial_path = protocol_dir / "CFAD.cm.dev.trl.txt"
     eval_trial_path = protocol_dir / f"CFAD.cm.{eval_split}.eval.trl.txt"
