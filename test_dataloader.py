@@ -9,9 +9,10 @@ import os
 import json
 import time
 
-# 切到 aasist 目录 (如果不在的话)
-if not os.path.exists("data_utils.py"):
-    os.chdir("/home/comp/25450212/aasist/aasist")  # main.py, data_utils.py 所在目录
+# 确保能找到 aasist 子目录中的模块 (main.py, data_utils.py 所在)
+CODE_DIR = "/home/comp/25450212/aasist/aasist"
+if CODE_DIR not in sys.path:
+    sys.path.insert(0, CODE_DIR)
 
 import torch
 import numpy as np
@@ -40,16 +41,16 @@ def test_split(name, db_subdir, protocol_file, is_train=False, is_eval=False):
     print(f"  Protocol file: {protocol_path}  -> exists: {protocol_path.exists()}")
 
     if not db_path.exists():
-        print(f"  ❌ FAIL: Database directory not found!")
+        print(f"  [FAIL] FAIL: Database directory not found!")
         return False
     if not protocol_path.exists():
-        print(f"  ❌ FAIL: Protocol file not found!")
+        print(f"  [FAIL] FAIL: Protocol file not found!")
         return False
 
     # 2. 检查 flac 目录
     flac_dir = db_path / "flac"
     if not flac_dir.exists():
-        print(f"  ❌ FAIL: flac/ subdirectory missing under {db_path}")
+        print(f"  [FAIL] FAIL: flac/ subdirectory missing under {db_path}")
         return False
     n_files = len(list(flac_dir.glob("*.flac")))
     print(f"  .flac files in flac/: {n_files}")
@@ -79,9 +80,9 @@ def test_split(name, db_subdir, protocol_file, is_train=False, is_eval=False):
         if not fpath.exists():
             missing += 1
     if missing > 0:
-        print(f"  ⚠️  WARNING: {missing}/200 protocol entries have NO matching .flac file")
+        print(f"  [WARN]  WARNING: {missing}/200 protocol entries have NO matching .flac file")
     else:
-        print(f"  ✅  200/200 spot-check passed (protocol ↔ files match)")
+        print(f"  [PASS]  200/200 spot-check passed (protocol <-> files match)")
 
     # 5. 测试 Dataset 加载 (前5个样本)
     print(f"  Testing Dataset.__getitem__() ...")
@@ -98,9 +99,9 @@ def test_split(name, db_subdir, protocol_file, is_train=False, is_eval=False):
             else:
                 audio, key = sample
                 print(f"    [{i}] shape={audio.shape}, key={key}")
-        print(f"  ✅  Dataset loading OK")
+        print(f"  [PASS]  Dataset loading OK")
     except Exception as e:
-        print(f"  ❌ FAIL: {e}")
+        print(f"  [FAIL] FAIL: {e}")
         return False
 
     # 6. 测试 DataLoader
@@ -126,9 +127,9 @@ def test_split(name, db_subdir, protocol_file, is_train=False, is_eval=False):
                 audio, keys = batch
                 print(f"    Batch {i}: audio={audio.shape}, keys={len(keys)}")
         t1 = time.time()
-        print(f"  ✅  DataLoader OK ({t1 - t0:.2f}s for 3 batches)")
+        print(f"  [PASS]  DataLoader OK ({t1 - t0:.2f}s for 3 batches)")
     except Exception as e:
-        print(f"  ❌ FAIL: {e}")
+        print(f"  [FAIL] FAIL: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -171,9 +172,9 @@ def main():
     passed = sum(results)
     total = len(results)
     if passed == total:
-        print(f"  ✅  ALL {total}/{total} TESTS PASSED — ready to train!")
+        print(f"  [PASS]  ALL {total}/{total} TESTS PASSED -- ready to train!")
     else:
-        print(f"  ❌  {passed}/{total} passed, {total - passed} FAILED")
+        print(f"  [FAIL]  {passed}/{total} passed, {total - passed} FAILED")
         print(f"  Fix the issues above before running full training.")
     print("=" * 60)
 

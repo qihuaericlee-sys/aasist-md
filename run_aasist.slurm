@@ -3,10 +3,14 @@
 #  AASIST 训练任务 — Slurm 提交脚本  (HKBU DAAI GPU Cluster)
 # ===========================================================================
 #  用法:
-#    sbatch run_aasist.slurm                              # 默认: V100, unseen
-#    sbatch --export=GPU_TYPE=A100 run_aasist.slurm        # A100, unseen
-#    sbatch --export=GPU_TYPE=A100,EVAL_SPLIT=seen run_aasist.slurm
-#    sbatch --export=RESUME=1 run_aasist.slurm              # 从 checkpoint 续训
+#    sbatch run_aasist.slurm                                    # 默认: AASIST, V100, unseen
+#    sbatch --export=MODEL=RawNet2,GPU_TYPE=A100 run_aasist.slurm  # RawNet2 on A100
+#    sbatch --export=MODEL=RawGATST run_aasist.slurm             # RawGATST on V100
+#    sbatch --export=EVAL_SPLIT=seen run_aasist.slurm            # seen 评估
+#    sbatch --export=RESUME=1 run_aasist.slurm                    # 从 checkpoint 续训
+#
+#  可用 MODEL:  AASIST (默认) | RawNet2 | RawGATST
+#  可用 GPU_TYPE: V100 (默认, long分区) | A100 (short分区)
 #
 #    srun --gres=gpu:1 --cpus-per-task=4 --time=00:30:00 --pty bash run_aasist.slurm  # 交互式
 # ===========================================================================
@@ -16,7 +20,7 @@
 #SBATCH --output=/home/comp/25450212/logs/aasist_%j.out  # 标准输出日志 (%j = JobID)
 #SBATCH --error=/home/comp/25450212/logs/aasist_%j.err   # 错误日志
 #SBATCH --partition=long                   # 分区: long=V100(14天) / short=A100/H20(5天)
-#SBATCH --time=7-00:00:00                  # 最大运行时间 (long分区最长14天)
+#SBATCH --time=5-00:00:00                  # 最大运行时间 (long 分区最高可改为 14-00:00:00)
 #SBATCH --nodes=1                          # 节点数
 #SBATCH --ntasks=1                         # 任务数
 #SBATCH --gres=gpu:1                       # GPU 数量 (调试用1; 多卡改 2-4 for V100, 2-8 for A100)
@@ -72,36 +76,70 @@ echo ""
 echo "Working dir: $(pwd)"
 
 # ── 参数 (通过 sbatch --export= 环境变量控制) ────────────────────────────
-# GPU_TYPE:  V100 | A100   → 自动选择分区和 batch_size
+# MODEL:     AASIST | RawNet2 | RawGATST  → 选择模型架构
+# GPU_TYPE:  V100 | A100   → 选择 config 和 batch_size
 # EVAL_SPLIT: seen | unseen
 # RESUME:     1 = 从 checkpoint 续训
 # SEED:       随机种子
+MODEL="${MODEL:-AASIST}"                     # AASIST, RawNet2, RawGATST
 GPU_TYPE="${GPU_TYPE:-V100}"                 # V100 (32GB) 或 A100 (80GB)
 EVAL_SPLIT="${EVAL_SPLIT:-unseen}"           # seen 或 unseen
 RESUME="${RESUME:-0}"                        # 1 = 续训
-COMMENT="${COMMENT:-cluster_${GPU_TYPE}}"    # 实验备注
+COMMENT="${COMMENT:-${MODEL}_${GPU_TYPE}_${EVAL_SPLIT}}"   # 实验备注
 SEED="${SEED:-1234}"
 
-# ── 根据 GPU 类型选择配置 ────────────────────────────────────────────────
-if [ "${GPU_TYPE}" = "V100" ]; then
-    CONFIG="./config/AASIST_v100.conf"
-    BATCH_SIZE=16
-    PARTITION="long"
-    MAX_TIME="7-00:00:00"
-elif [ "${GPU_TYPE}" = "A100" ]; then
-    CONFIG="./config/AASIST_a100.conf"
-    BATCH_SIZE=64
-    PARTITION="short"
-    MAX_TIME="5-00:00:00"
-else
-    echo "ERROR: 未知 GPU_TYPE=${GPU_TYPE}, 请设为 V100 或 A100"
-    exit 1
-fi
+# ── 根据 MODEL + GPU_TYPE 选择配置 ───────────────────────────────────────
+case "${MODEL}" in
+    AASIST)
+        if [ "${GPU_TYPE}" = "V100" ]; then
+            CONFIG="./config/AASIST_v100.conf"
+            BATCH_SIZE=16
+            PARTITION="long"
+            MAX_TIME="14-00:00:00"
+        else
+            CONFIG="./config/AASIST_a100.conf"
+            BATCH_SIZE=64
+            PARTITION="short"
+            MAX_TIME="5-00:00:00"
+        fi
+        ;;
+    RawNet2)
+        if [ "${GPU_TYPE}" = "V100" ]; then
+            CONFIG="./config/RawNet2_v100.conf"
+            BATCH_SIZE=16
+            PARTITION="long"
+            MAX_TIME="14-00:00:00"
+        else
+            CONFIG="./config/RawNet2_a100.conf"
+            BATCH_SIZE=32
+            PARTITION="short"
+            MAX_TIME="5-00:00:00"
+        fi
+        ;;
+    RawGATST)
+        if [ "${GPU_TYPE}" = "V100" ]; then
+            CONFIG="./config/RawGATST_v100.conf"
+            BATCH_SIZE=16
+            PARTITION="long"
+            MAX_TIME="14-00:00:00"
+        else
+            CONFIG="./config/RawGATST_a100.conf"
+            BATCH_SIZE=24
+            PARTITION="short"
+            MAX_TIME="5-00:00:00"
+        fi
+        ;;
+    *)
+        echo "ERROR: 未知 MODEL=${MODEL}, 请设为 AASIST, RawNet2, 或 RawGATST"
+        exit 1
+        ;;
+esac
 
 OUTPUT_DIR="./exp_result"
 
 echo ""
 echo "=== 运行参数 ==="
+echo "Model:      ${MODEL}"
 echo "GPU type:   ${GPU_TYPE}"
 echo "Batch size: ${BATCH_SIZE}"
 echo "Config:     ${CONFIG}"
