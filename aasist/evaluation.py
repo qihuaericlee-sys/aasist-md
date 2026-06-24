@@ -337,25 +337,90 @@ def compute_tDCF(bonafide_score_cm, spoof_score_cm, Pfa_asv, Pmiss_asv,
 
 def calculate_EER(cm_scores_file, output_file=None, printout=True):
     """
-    Calculate EER only (no t-DCF, no ASV scores needed).
-    Returns (eer_percent, 1.0) to keep the same (eer, tdcf) signature
-    as the original calculate_tDCF_EER, so main.py needs minimal changes.
+    Calculate EER, F1-score at the EER threshold, and per-attack-type EER.
+    No t-DCF (requires ASV scores not available for CFAD).
+    Returns (eer_percent, f1_score).
     """
     cm_data = np.genfromtxt(cm_scores_file, dtype=str)
-    cm_keys = cm_data[:, 2]
+    if cm_data.ndim == 1:
+        cm_data = cm_data.reshape(1, -1)
+
+    cm_attacks = cm_data[:, 1]       # attack type: A01, A02, ..., R01, ...
+    cm_keys = cm_data[:, 2]          # label: bonafide or spoof
     cm_scores = cm_data[:, 3].astype(np.float64)
 
-    bona_cm = cm_scores[cm_keys == 'bonafide']
-    spoof_cm = cm_scores[cm_keys == 'spoof']
+    bona_mask = (cm_keys == 'bonafide')
+    spoof_mask = (cm_keys == 'spoof')
 
-    eer_cm = compute_eer(bona_cm, spoof_cm)[0]
+    bona_scores_all = cm_scores[bona_mask]
+    spoof_scores_all = cm_scores[spoof_mask]
+    spoof_attacks_all = cm_attacks[spoof_mask]
 
+    # ── Overall EER + F1 ────────────────────────────────────────
+    eer, threshold = compute_eer(bona_scores_all, spoof_scores_all)
+
+    tp = np.sum(bona_scores_all >= threshold)
+    fn = np.sum(bona_scores_all < threshold)
+    fp = np.sum(spoof_scores_all >= threshold)
+    tn = np.sum(spoof_scores_all < threshold)
+
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    recall    = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+
+    # ── Per-attack-type EER ──────────────────────────────────────
+    all_attacks = sorted(set(spoof_attacks_all))
+    per_attack = {}  # {attack: (eer_percent, n_spoof)}
+    for atk in all_attacks:
+        atk_scores = cm_scores[(spoof_mask) & (cm_attacks == atk)]
+        if len(atk_scores) > 0:
+            per_attack[atk] = (compute_eer(bona_scores_all, atk_scores)[0] * 100, len(atk_scores))
+
+    # ── Group summaries ──────────────────────────────────────────
+    def group_eer(atk_list):
+        mask = np.isin(spoof_attacks_all, atk_list)
+        if np.sum(mask) == 0:
+            return None, 0
+        group_scores = spoof_scores_all[mask]
+        return compute_eer(bona_scores_all, group_scores)[0] * 100, len(group_scores)
+
+    clean_seen_eer,  n_clean_seen  = group_eer(['A01','A02','A03','A04','A05','A06','A07','A08'])
+    clean_unseen_eer,n_clean_unseen = group_eer(['A09','A10','A11','A12'])
+    replay_seen_eer, n_replay_seen = group_eer(['R01','R02','R03','R04'])
+    replay_unseen_eer,n_replay_unseen = group_eer(['R05','R06'])
+
+    # ── Write output ─────────────────────────────────────────────
     if printout and output_file:
         with open(output_file, "w") as f_res:
-            f_res.write('CM SYSTEM\n')
-            f_res.write('\tEER\t\t= {:8.9f} % '
-                        '(Equal error rate for countermeasure)\n'.format(
-                            eer_cm * 100))
+            f_res.write("=" * 58 + "\n")
+            f_res.write("CM SYSTEM\n")
+            f_res.write(f'  Overall EER = {eer*100:8.5f}%\n')
+            f_res.write(f'  F1          = {f1:8.5f}   (at EER threshold)\n')
+            f_res.write(f'  Precision   = {precision:8.5f}\n')
+            f_res.write(f'  Recall      = {recall:8.5f}\n')
+            f_res.write(f'  Threshold   = {threshold:8.5f}\n')
+            f_res.write(f'  #Bona       = {len(bona_scores_all):>8d}\n')
+            f_res.write(f'  #Spoof      = {len(spoof_scores_all):>8d}\n')
+
+            f_res.write("\n" + "-" * 58 + "\n")
+            f_res.write("PER-ATTACK EER\n")
+            f_res.write(f"  {'Attack':>6s}   {'EER %':>9s}   {'#Spoof':>8s}\n")
+            f_res.write("  " + "-" * 31 + "\n")
+            for atk in sorted(per_attack.keys()):
+                e, n = per_attack[atk]
+                f_res.write(f"  {atk:>6s}   {e:8.2f}%   {n:>8d}\n")
+
+            f_res.write("\n" + "-" * 58 + "\n")
+            f_res.write("GROUP SUMMARY\n")
+            if clean_seen_eer is not None:
+                f_res.write(f"  Clean Seen   (A01-A08):  EER = {clean_seen_eer:7.2f}%  (n={n_clean_seen})\n")
+            if clean_unseen_eer is not None:
+                f_res.write(f"  Clean Unseen (A09-A12):  EER = {clean_unseen_eer:7.2f}%  (n={n_clean_unseen})\n")
+            if replay_seen_eer is not None:
+                f_res.write(f"  Replay Seen  (R01-R04):  EER = {replay_seen_eer:7.2f}%  (n={n_replay_seen})\n")
+            if replay_unseen_eer is not None:
+                f_res.write(f"  Replay Unseen(R05-R06):  EER = {replay_unseen_eer:7.2f}%  (n={n_replay_unseen})\n")
+            f_res.write("=" * 58 + "\n")
         os.system(f"cat {output_file}")
 
-    return eer_cm * 100, 1.0
+    return eer * 100, f1
